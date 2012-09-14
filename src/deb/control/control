@@ -1,0 +1,13 @@
+Package: supernanny
+Version: 1.10.tuenti1
+Section: misc
+Priority: optional
+Architecture: all
+Depends: java-virtual-machine, mercurial, git, bzip2, tar, gzip
+Maintainer: Goran Petrovic <gpetrovic@tuenti.com>
+Distribution: development
+Description: Artifact dependency management is sometimes not enough. In large environments,
+ developers need to be able to develop libraries in the scope of the bigger
+ project which depends on this library.
+ supernanny manages dependencies of repository
+ types and archives, and is able to publish and resolve them.

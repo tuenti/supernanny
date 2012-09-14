@@ -1,0 +1,122 @@
+.TH supernanny 1  "February 22, 2012" "version 1.10" "USER COMMANDS"
+.SH NAME
+supernanny \- manage your dependancies with git(1), hg(1) and tar(1) repositories.
+.SH SYNOPSIS
+.B supernanny
+[\--help] [\-\-pretend] <command>
+.SH DESCRIPTION
+Artifact dependency management is sometimes not enough. In large environments,
+developers need to be able to develop libraries in the scope of the bigger
+project which depends on this library.
+.PP
+supernanny manages dependencies of repository types and archives, and is able to
+publish and resolve them.
+.SH SWITCHES
+These are the switches you can pass to supernanny for altered behaviour.
+.TP
+.IR \-\-help
+display a short help text
+.TP
+.IR \-\-pretend
+do a dry-run of the command
+.SH OPTIONS
+These are the commands you can run with supernanny. Each command runs a different functionality of supernanny.
+.IP status
+list project's dependencies, and report inconsistencies (missing dependencies, unneccesary dependencies and other changes)
+.IP exports
+lists libraries the project exports, and the publish types and destinations
+.IP fetch
+resovles the dependecies from project's
+.IR .DEP
+file and fetches them to the lib folder
+.IP publish
+gets the libraries from project's
+.IR .EXPORTS
+file and publishes them, querying the version desired for each dependency. Same library can be exported to
+multiple types (e.g. as a git repository tag and a tar.bz2).
+.SH FILES
+.I $PROJECT/.DEP
+.RS
+Configuration of project's dependencies, a list of dependencies with format:
+.PP
+<name> <type> <uri> <version>
+.PP
+type being one of: GIT, MERCURIAL, TARGZ, TARBZ2, e.g.
+.PP
+tu-memcache GIT git://github.com/tuenti/memcached-tuenti-multiport.git stable-1.3
+.PP
+pypy MERCURIAL https://bitbucket.org/pypy/pypy default
+.PP
+portage TARBZ2 http://gentoo.inode.at/snapshots/ latest
+.PP
+# comments begin with the hash character
+.RE
+.I $PROJECT/.EXPORTS
+.RS
+Configuration of project's export libraries, a list of artifacts with format:
+.PP
+<name> <type> <uri> [<target_folder> - only for tar]
+.PP
+type being one of: GIT, MERCURIAL, TARGZ, TARBZ2, e.g.
+.PP
+tu-memcache GIT git://github.com/tuenti/memcached-tuenti-multiport.git
+.PP
+pypy MERCURIAL https://bitbucket.org/pypy/pypy
+.PP
+portage TARBZ2 ssh://local-data:/var/snapshots/
+.PP
+# comments begin with the hash character
+.PP
+If target folder is given, only that folder will be archived and published under tar types. If not present, the working folder is taked instead. Other types ignore this option.
+Of course, supernanny expects to have permissions to create tags/archives and push them to the remote repository, be it a mercurial, git or a ssh one.
+.RS
+.RE
+.I /etc/supernanny.conf
+.RS
+The system wide configuration file.
+.RE
+.I ~/.supernannyrc
+.RS
+.RE
+Per user configuration file.
+.PP
+Configuration files may contain overrides for per-project dependency. File format should be:
+.PP
+.TP
+[project-foo]
+.I contents-of-dep-file
+.PP
+.TP
+[project-bar]
+.I contents-of-dep-file
+.SH EXAMPLES
+.TP
+Get the status of current project's dependencies
+.B supernanny
+status
+.PP
+.TP
+Get the dependencies exported by the project
+.B supernanny
+exports
+.PP
+.TP
+Resolve and fetch all project's dependencies
+.B supernanny
+fetch
+.PP
+.TP
+Publish dependencies exported by the project
+.B supernanny
+publish
+.PP
+.SH EXIT STATUS
+supernanny returns a zero exist status if it succeeds, otherwise it returns with
+the error code it died with, usually 1. Additionally, it prints the error message
+to the screen.
+.SH AUTHOR
+Goran Petrovic (gpetrovic@tuenti.com)
+.SH SEE ALSO
+.BR git(1),
+.BR hg(1),
+.BR tar(1)
