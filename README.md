@@ -20,9 +20,12 @@ Dependencies are defined in .DEP file in the root of the project. Each line defi
 Type of the dependency currently must be one of the following: GIT, MERCURIAL, TARGZ, TARBZ2, e.g.
 
 # my project dependencies
+
+```
 tu-memcache GIT git://github.com/tuenti/memcached-tuenti-multiport.git stable-1.3
 pypy MERCURIAL https://bitbucket.org/pypy/pypy default
 portage TARBZ2 http://gentoo.inode.at/snapshots/ latest
+ ```
 
 This project defines 3 dependencies, each at their own versions, specifying a URI where to find them.
 
@@ -43,12 +46,12 @@ In detail:
 2. Fetching dependencies
 ---------------------------
 Once the project defines the .DEP file, fetching dependencies is trivia:
-
+ ```
 $ supernanny fetch
 	# fetched lib/tu-memcache@stable-1.3
 	# fetched lib/pypy@default
 	# fetched lib/portage@latest
-
+ ```
 3. Getting dependency status
 -----------------------------
 Sometimes, you will want to know what is the status of your dependencies. Maybe you added, removed of changed some of them, and you want to see the status. You can do that using the status command:
