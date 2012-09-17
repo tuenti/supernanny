@@ -5,9 +5,10 @@ Supernanny
 SuperNanny is a dependency management tool developed in-house, for managing dependencies between repositories 
 and arifacts. It supports resolving and fetching defined dependencies and exporting them. 
 
-Since we mostly used php we implemented a system similar to ivy to manage our libraries.
-Dependencies can be expresed as artifacts or as source control repos. Artifacts follow a versioning scheme.
+Since we mostly used php we implemented a system similar to ivy to manage our libraries,like ivy supernanny is language agnostic so 
+it can be used to retrieve dependencies in any language.
 
+Dependencies can be expresed as artifacts or as source control repos. Artifacts follow a versioning scheme.
 
 
 1. Dependency definition
@@ -19,7 +20,7 @@ Dependencies are defined in .DEP file in the root of the project. Each line defi
 
 Type of the dependency currently must be one of the following: GIT, MERCURIAL, TARGZ, TARBZ2, e.g.
 
-# my project dependencies
+### my project dependencies
 
 ```
 tu-memcache GIT git://github.com/tuenti/memcached-tuenti-multiport.git stable-1.3
@@ -31,14 +32,15 @@ This project defines 3 dependencies, each at their own versions, specifying a UR
 
 In detail:
  
-  common TARBZ2 http://artifacts.server.int/ 2.*
+   ```common TARBZ2 http://artifacts.server.int/ 2.*  ```
+
       This pulls an artifact with major version 2 and any minor version. The artifacts is really a TAR file
       downloaded from the artifacts server
   
-  backend-framework TARBZ2 http://artifacts.server.int/ 13.7
+   ```backend-framework TARBZ2 http://artifacts.server.int/ 13.7 ```
       This pulls version 13.7 of the backend-framework artifact
   
-  config MERCURIAL http://pull.code.some.repo/config default
+  ``` config MERCURIAL http://pull.code.some.repo/config default ```
       This pulls a dependency as a version control depot from mercurial, you can substitute
       mercurial by git and it also works.
   
@@ -46,6 +48,7 @@ In detail:
 2. Fetching dependencies
 ---------------------------
 Once the project defines the .DEP file, fetching dependencies is trivia:
+ 
  ```
 $ supernanny fetch
 	# fetched lib/tu-memcache@stable-1.3
@@ -71,8 +74,10 @@ $ supernanny status
 
 inconsistent - consider refetching dependencies
 
+```
 Status will warn you of removed dependencies that are still present, and newly added dependencies that are not yet fetched. It will also suggest fetching them again, to solve everything. After the fetch, it should look like this:
 
+```
 $ supernanny status
 # dependencies
 
@@ -85,9 +90,12 @@ $ supernanny status
 ------------------------------
 Every project can export some libraries, maybe the whole project as a library. The definition of exports is done in .EXPORTS file in the project's root, like this:
 
-# exporting befw as a git repo and as an archive
+### exporting befw as a git repo and as an archive
+
+```
 befw GIT ssh://code.somewhere.com:/srv/git/supernanny
 befw TARBZ2 ssh://code.somewhere.com:/srv/supernanny build/
+```
 
 Note that tar strategies take a folder to publish as the 4th parameter. If omitted, the working directory is published.
 To publish these artifacts, execute the publish command. The publish command will query for versions you want to export these artifacts under:
@@ -99,9 +107,10 @@ Please input the version for befw for TARGZ: 1.4
 
 	# published befw@1.3
 	# published befw@1.4
-
+```
 To see what libraries a project exports, execute the exports command:
 
+```
 $ supernanny exports
 # project's export targets
 
@@ -118,7 +127,8 @@ To make a dry-run, add --prented switch to fetch or publish commands, to get a s
 $ supernanny publish --pretend
 	# would publish befw to ssh://code.somewhere.com:/srv/supernanny/ (TARBZ2)
 	# would publish befw to ssh://code.somewhere.com:/srv/supernanny/ (TARGZ)
-
+```
+```
 $ supernanny fetch --pretend
 	# would fetch class-loader @ 1.* from ssh://code.somewhere.com:/srv/supernanny/ (TARBZ2)
 	# would fetch tu-memcache @ stable-1.3 from git://github.com/tuenti/memcached-tuenti-multiport.git (GIT)
@@ -216,7 +226,9 @@ In Tuenti build scripts, this is usually wrapped in ant targets publish-minor, p
 
 If you remove a dependency from supernanny, it will delete the folder on the next run. In order to tell supernanny not to touch a folder because, e.g. you have modified some things and don't want it to kill them, you can add a NOOP dependency type, e.g.
 
+```
 befw NOOP git://github.com/tuenti/memcached-tuenti-multiport.git stable-1.3
+```
 
 11. Installing supernanny
 --------------------------
