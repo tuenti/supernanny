@@ -4,7 +4,7 @@ Supernanny
 SuperNanny is a dependency management tool developed in-house, for managing dependencies between repositories 
 and artifacts. It supports resolving and fetching defined dependencies and exporting them. 
 
-Since we mostly used php we implemented a system similar to ivy to manage our libraries, like ivy supernanny is language agnostic so 
+Since we mostly used PHP we implemented a system similar to Ivy to manage our libraries, like Ivy, supernanny is language agnostic so 
 it can be used to retrieve dependencies in any language.
 
 Dependencies can be expresed as artifacts or as source control repos. Artifacts follow a versioning scheme.
@@ -48,7 +48,7 @@ mercurial by git and it also works.
   
 2. Fetching dependencies
 ---------------------------
-Once the project defines the .DEP file, fetching dependencies is trivia:
+Once the project defines the .DEP file, fetching dependencies is trivial:
  
  ```
 $ supernanny fetch
@@ -122,7 +122,7 @@ $ supernanny exports
 5. Pretend
 ----------
 
-To make a dry-run, add --prented switch to fetch or publish commands, to get a summary of what would happen, but not actually do it:
+To make a dry-run, add --pretend switch to fetch or publish commands, to get a summary of what would happen, but not actually do it:
 
 ```
 $ supernanny publish --pretend
