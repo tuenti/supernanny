@@ -34,15 +34,17 @@ In detail:
  
    ```common TARBZ2 http://artifacts.server.int/ 2.*  ```
 
-      This pulls an artifact with major version 2 and any minor version. The artifacts is really a TAR file
-      downloaded from the artifacts server
+This pulls an artifact with major version 2 and any minor version. The artifacts is really a TAR file
+downloaded from the artifacts server
   
    ```backend-framework TARBZ2 http://artifacts.server.int/ 13.7 ```
-      This pulls version 13.7 of the backend-framework artifact
+
+This pulls version 13.7 of the backend-framework artifact
   
   ``` config MERCURIAL http://pull.code.some.repo/config default ```
-      This pulls a dependency as a version control depot from mercurial, you can substitute
-      mercurial by git and it also works.
+      
+This pulls a dependency as a version control depot from mercurial, you can substitute
+mercurial by git and it also works.
   
   
 2. Fetching dependencies
