@@ -1,11 +1,10 @@
-
 Supernanny
 =============
 
 SuperNanny is a dependency management tool developed in-house, for managing dependencies between repositories 
-and arifacts. It supports resolving and fetching defined dependencies and exporting them. 
+and artifacts. It supports resolving and fetching defined dependencies and exporting them. 
 
-Since we mostly used php we implemented a system similar to ivy to manage our libraries,like ivy supernanny is language agnostic so 
+Since we mostly used php we implemented a system similar to ivy to manage our libraries, like ivy supernanny is language agnostic so 
 it can be used to retrieve dependencies in any language.
 
 Dependencies can be expresed as artifacts or as source control repos. Artifacts follow a versioning scheme.
