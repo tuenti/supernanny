@@ -1,0 +1,8 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: supernanny
+Upstream-Contact: Goran Petrovic <gpetrovic@tuenti.com>
+Source: https://github.com/tuenti/supernanny
+
+Files: *
+Copyright: (C) 2012 Goran Petrovic <gpetrovic@tuenti.com>
+License: Unknown
