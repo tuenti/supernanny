@@ -7,8 +7,17 @@ and artifacts in any language. It supports resolving and fetching defined depend
 
 Dependencies can be expresed as artifacts or as source control repos. Artifacts follow a versioning scheme.
 
+1. Build and installation
+-------------------------
 
-1. Dependency definition
+Build is done using maven:
+
+   ```mvn assembly:assembly exec:exec install```
+
+What generates the binary files in the `target` directory, there you can find the jars you can directly use with `java -jar` or the debian file you can install in Debian or Ubuntu systems.
+
+
+2. Dependency definition
 --------------------------
 
 Dependencies are defined in .DEP file in the root of the project. Each line defines a single dependency. Comment lines begin with #. Dependencies are of format:
@@ -44,7 +53,7 @@ This pulls a dependency as a version control depot from mercurial, you can subst
 mercurial by git and it also works.
   
   
-2. Fetching dependencies
+3. Fetching dependencies
 ---------------------------
 Once the project defines the .DEP file, fetching dependencies is trivial:
  
@@ -54,7 +63,7 @@ $ supernanny fetch
 	# fetched lib/pypy@default
 	# fetched lib/portage@latest
  ```
-3. Getting dependency status
+4. Getting dependency status
 -----------------------------
 Sometimes, you will want to know what is the status of your dependencies. Maybe you added, removed of changed some of them, and you want to see the status. You can do that using the status command:
 
@@ -85,7 +94,7 @@ $ supernanny status
 	# tu-memcache @ stable-1.3 from git://github.com/tuenti/memcached-tuenti-multiport.git (GIT)
 ```
 
-4. Exported library definition
+5. Exported library definition
 ------------------------------
 Every project can export some libraries, maybe the whole project as a library. The definition of exports is done in .EXPORTS file in the project's root, like this:
 
@@ -117,7 +126,7 @@ $ supernanny exports
 	# befw to ssh://code.somewhere.com:/srv/supernanny/ (TARGZ)
 ```
 
-5. Pretend
+6. Pretend
 ----------
 
 To make a dry-run, add --pretend switch to fetch or publish commands, to get a summary of what would happen, but not actually do it:
@@ -133,7 +142,7 @@ $ supernanny fetch --pretend
 	# would fetch tu-memcache @ stable-1.3 from git://github.com/tuenti/memcached-tuenti-multiport.git (GIT)
 ```
 
-6. Integration with ant
+7. Integration with ant
 ------------------------
 
 SuperNanny provides 2 ant targets, for fetching and publishing artifacts, that correspond to publish and fetch commands of supernanny. Here's how to use them.
@@ -168,7 +177,7 @@ The publish task takes versions parameter which define at which versions you wan
 ```
 
 
-7. Forcing specific versions
+8. Forcing specific versions
 -----------------------------
 
 If you don't want to change your .DEP file, and still override some entries, there are several ways:
@@ -184,7 +193,7 @@ Using --force to set specific versions of dependencies. They must exist in one o
 supernanny fetch --force befw=1.3.2,tuenti-build=1.4
 ```
 
-8. Prefixing
+9. Prefixing
 --------------
 
 You can add any prefix to all publishes with --prefix:
@@ -193,7 +202,7 @@ You can add any prefix to all publishes with --prefix:
 supernanny publish --prefix=beta
 ```
 
-9. Easy new version releases
+10. Easy new version releases
 ------------------------------
 
 Supernanny can recognize version formats and use it to release new versions.
@@ -228,25 +237,3 @@ If you remove a dependency from supernanny, it will delete the folder on the nex
 ```
 befw NOOP git://github.com/tuenti/memcached-tuenti-multiport.git stable-1.3
 ```
-
-11. Installing supernanny
---------------------------
-
-SuperNanny is a Java application, basically a .jar file, and can be used as such:
-
-```
-$ java -jar supernanny.jar help
-Usage: com.tuenti.supernanny.cli.handlers.CliParser
-  help [flag] Shows help
-  exports [flag] Shows help
-  --pretend [flag] Don't actually execute the command, only show info.
-  publish [flag] Publish a dependency
-  fetch [flag] Fetch project dependencies
-  status [flag] Shows dependency status
-```
-
-
-
-
-
-
