@@ -1,0 +1,70 @@
+Name: befw
+Version: 1.0.0
+File: befw-1.0.0.tar.bz2
+MD5: 123
+Deps:
+  tuenti-common TARBZ2 http://localhost >=1.0
+  tuenti-build TARBZ2 http://localhost =9.0
+
+Name: tuenti-common
+Version: 1.7.0
+File: tuenti-common-1.7.0.tar.bz2
+MD5: 123
+Deps:
+  tuenti-build TARBZ2 http://localhost =9.0
+  futi TARBZ2 http://localhost >2.1.0
+
+Name: futi
+Version: 3.0
+File: futi-3.0.tar.bz2
+MD5: 123
+Deps:
+
+Name: tuenti-build
+Version: 9.0
+File:tuenti-build-9.0.tar.bz2
+MD5: 123
+Deps:
+
+Name: tuenti-build
+Version: 8.0
+File:tuenti-build-8.0.tar.bz2
+MD5: 123
+Deps:
+
+Name: something-weird
+Version: 1.0
+File: something-weird-1.0.tar.bz2
+MD5: 123
+Deps:
+  tuenti-build TARBZ2 http://localhost =10.0
+
+Name: conflicting
+Version: 1.0
+File: conflicting-1.0.tar.bz2
+MD5: 123
+Deps:
+  tuenti-build TARBZ2 http://localhost =8.0
+  tuenti-common TARBZ2 http://localhost >1.0.0
+
+Name: flik
+Version: 1.0
+File: flik-1.0.tar.bz2
+MD5: 123
+Deps:
+  flak TARBZ2 http://localhost =1.0
+
+Name: flak
+Version: 1.0
+File: flak-1.0.tar.bz2
+MD5: 123
+Deps:
+  flok TARBZ2 http://localhost =1.0
+
+Name: flok
+Version: 1.0
+File: flok-1.0.tar.bz2
+MD5: 123
+Deps:
+  flik TARBZ2 http://localhost =1.0
+

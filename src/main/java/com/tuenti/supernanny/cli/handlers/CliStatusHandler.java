@@ -7,6 +7,8 @@
  */
 package com.tuenti.supernanny.cli.handlers;
 
+import java.io.IOException;
+
 import com.google.inject.Inject;
 import com.tuenti.supernanny.cli.ProjectStatus;
 
@@ -18,12 +20,15 @@ import com.tuenti.supernanny.cli.ProjectStatus;
  * @author Goran Petrovic <gpetrovic@tuenti.com>
  */
 public class CliStatusHandler implements CliHandler {
-	@Inject private ProjectStatus status;
 	@Inject CliParser p;
-
+	@Inject ProjectStatus status;
 	@Override
 	public String handle() {
-		System.out.println(status.toString());
+		try {
+			status.printStatus();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		return null;
 	}
 }

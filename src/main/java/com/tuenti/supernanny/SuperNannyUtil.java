@@ -4,6 +4,7 @@
  * @package Build
  * @subpackage Dependencies
  * @author Goran Petrovic <gpetrovic@tuenti.com>
+ * @author Jesus Bravo Alvarez <suso@tuenti.com>
  */
 package com.tuenti.supernanny;
 
@@ -13,7 +14,6 @@ import java.io.Console;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -21,22 +21,24 @@ import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
+import java.util.Properties;
 import java.util.Vector;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.inject.Inject;
-import com.google.inject.Provider;
 import com.google.inject.Singleton;
-import com.googlecode.sardine.DavResource;
 import com.tuenti.supernanny.cli.handlers.CliParser;
-import com.tuenti.supernanny.dependencies.Dependency;
-import com.tuenti.supernanny.dependencies.Dependency.DepType;
-import com.tuenti.supernanny.dependencies.NoOpDependency;
+import com.tuenti.supernanny.dependencies.RepositoryType;
+import com.tuenti.supernanny.repo.RepoProvider;
+import com.tuenti.supernanny.repo.Repository;
+import com.tuenti.supernanny.repo.artifacts.Export;
+import com.tuenti.supernanny.repo.artifacts.ReqType;
+import com.tuenti.supernanny.repo.artifacts.Requirement;
 
 /**
  * Utility helper for SuperNanny.
@@ -46,225 +48,62 @@ import com.tuenti.supernanny.dependencies.NoOpDependency;
 @Singleton
 public class SuperNannyUtil implements Util {
 	@Inject
-	Logger l;
+	RepoProvider repoProvider;
+
 	@Inject
-	Provider<Dependency> depProvider;
+	Logger l;
 	private File root;
-	private Map<String, List<DavResource>> davCache = new HashMap<String, List<DavResource>>();
+
+	@Inject
+	CliParser p;
 
 	@Override
 	public File getTmpFile() {
-		File file = new File(System.getProperty("java.io.tmpdir"),
-				new BigInteger(130, new SecureRandom()).toString(32));
+		File file = new File(System.getProperty("java.io.tmpdir"), "SN_"
+				+ new BigInteger(130, new SecureRandom()).toString(32));
 		file.deleteOnExit();
 		return file;
 	}
 
 	@Override
-	public String getDepsFolder() {
-		return getFile(root, DEP_FOLDER).getAbsolutePath();
+	public File getDepsFolder() {
+		return new File(root, DEP_FOLDER);
 	}
 
 	@Override
-	public void deleteDir(File dir) {
-		if (dir.isDirectory()) {
-			for (File c : dir.listFiles())
-				deleteDir(c);
-		}
-		dir.delete();
+	public void deleteDir(File dir) throws IOException {
+		execProcess("rm -rf " + dir.getAbsolutePath());
 	}
 
 	@Override
-	public void stampProject(File depFolder, String uri, String version,
-			DepType type) throws IOException {
-		FileWriter fstream = new FileWriter(new File(depFolder,
-				SUPERNANNY_VERSION_FILE));
+	public void stampProject(String name, File depFolder, String uri, String version,
+			RepositoryType type) throws IOException {
+		FileWriter fstream = new FileWriter(new File(depFolder, SUPERNANNY_VERSION_FILE));
 		BufferedWriter out = new BufferedWriter(fstream);
-		out.write(depFolder.getName() + " " + type.toString() + " " + uri + " "
-				+ version + " ");
+		out.write(name + " " + type.toString() + " " + uri + " " + version + " ");
 		out.flush();
 		out.close();
 	}
 
 	@Override
-	public DepType getProjectDepType(File depRoot) throws IOException,
-			NoOpDependency {
-		Dependency projectDependancy = getProjectDependancy(depRoot);
-		if (projectDependancy == null) {
-			return null;
-		} else {
-			return projectDependancy.getType();
-		}
-	}
+	public List<Export> parseExportsFile(File exportsFile) throws IOException {
+		LinkedList<Export> exports = new LinkedList<Export>();
 
-	@Override
-	public Dependency getProjectDependancy(File depRoot) throws IOException,
-			NoOpDependency {
-		File statFile = new File(depRoot, SUPERNANNY_VERSION_FILE);
+		for (String strLine : lineByLine(exportsFile)) {
+			String[] depParts = strLine.split("\\s");
 
-		if (statFile.exists()) {
-
-			BufferedReader reader = new BufferedReader(new FileReader(statFile));
-			String line = null;
-
-			while ((line = reader.readLine()) != null) {
-				// ignore empty and commented lines
-				if (line.trim().startsWith(COMMENT_START_CHAR)
-						|| line.trim().length() == 0) {
-					continue;
-				}
-				String[] lineParts = line.split("\\s");
-				return depProvider.get().init(DepType.valueOf(lineParts[1]),
-						depRoot.getName(), lineParts[2], lineParts[3]);
+			Repository repo = repoProvider
+					.getRepo(RepositoryType.valueOf(depParts[1]), depParts[2]);
+			String name = depParts[0];
+			String folder = ".";
+			if (depParts.length == 4) {
+				folder = depParts[3];
 			}
-		} else {
-			System.out
-					.println(MessageFormat
-							.format("\n\tBroken dependency detected in {0}: Status file not found.\n",
-									depRoot.getAbsolutePath()));
-		}
-		return null;
-	}
 
-	@Override
-	public LinkedList<Dependency> parseMultipleDepFiles(Iterable<File> depsFile) {
-		LinkedList<Dependency> mergedDeps = new LinkedList<Dependency>();
-		for (File file : depsFile) {
-			mergedDeps.addAll(parseDepsFile(file));
-		}
-		return mergedDeps;
-	}
-
-	@Override
-	public LinkedList<Dependency> parseMultipleDepFiles(CliParser p) {
-		LinkedList<File> depFiles = new LinkedList<File>();
-		if (p.depfile == null) {
-			p.depfile = Util.DEP_FILE;
+			exports.add(new Export(repo, name, new File(folder)));
 		}
 
-		if (p.depfile.contains(",")) {
-			for (String depSource : p.depfile.split(",")) {
-				depFiles.add(new File(depSource));
-			}
-		} else {
-			depFiles.add(new File(p.depfile));
-		}
-
-		return parseMultipleDepFiles(depFiles);
-	}
-
-	@Override
-	public LinkedList<Dependency> parseDepsFile(File depsFile) {
-		LinkedList<Dependency> deps = new LinkedList<Dependency>();
-
-		int line = 0;
-		String[] depParts = null;
-		String currentLine = null;
-		try {
-			for (String strLine : lineByLine(depsFile)) {
-				currentLine = strLine;
-				++line;
-
-				depParts = strLine.split("\\s");
-
-				// try to parse the file line
-				// if cannot, die and report (error in file syntax )
-				Dependency dep = null;
-				try {
-					dep = depProvider.get().init(DepType.valueOf(depParts[1]),
-							depParts[0], depParts[2], depParts[3], depsFile);
-					deps.add(dep);
-					fixVersion(dep); // if contains *
-				} catch (IllegalArgumentException e) {
-					String message = MessageFormat.format(
-							"Wrong type: {0}; must be one of {1}", depParts[1],
-							Arrays.toString(DepType.values()));
-					l.warning(message);
-					System.out.println(message);
-					System.exit(1);
-				} catch (NoOpDependency e) {
-					dep = null;
-					try {
-						dep = depProvider.get().init(DepType.GIT, depParts[0],
-								depParts[2], depParts[3], depsFile);
-					} catch (NoOpDependency e1) {
-						// won't happen since type is git
-					}
-					dep.setDepType(DepType.NOOP);
-					deps.add(dep);
-					System.out.println(dep);
-					System.out
-							.println(MessageFormat
-									.format("Dependency {0} is set to do no operation; skipping...",
-											depParts[0]));
-				}
-			}
-		} catch (FileNotFoundException e) {
-			l.info("Deps file not found - not a supernanny project? Expected to find "
-					+ depsFile.toString());
-			return new LinkedList<Dependency>();
-
-		} catch (IOException e) {
-			l.info("Error in deps file : " + depsFile.toString());
-			System.exit(1);
-		} catch (ArrayIndexOutOfBoundsException e) {
-			String msg = MessageFormat
-					.format("Error in deps file : {0}\nIn line {1}, not enough parameter for dependency {2}, expected format:\n\n\t<name> <type> <uri> <version>\n\nactual entry:\n\n\t{3}\n\n",
-							depsFile.toString(), line, depParts[1], currentLine);
-			l.info(msg);
-			System.out.println(msg);
-
-			System.exit(1);
-		}
-
-		return deps;
-	}
-
-	private void fixVersion(Dependency dep) {
-		if (dep.getVersion().equals("*")) {
-			dep.setVersion(dep.getLatestVersion());
-		} else if (dep.getVersion().contains("*")) {
-			dep.setVersion(dep.matchVersion());
-		}
-	}
-
-	@Override
-	public LinkedList<Dependency> parseExportsFile(File exportsFile) {
-		LinkedList<Dependency> deps = new LinkedList<Dependency>();
-
-		try {
-			for (String strLine : lineByLine(exportsFile)) {
-				String[] depParts = strLine.split("\\s");
-
-				Dependency dep;
-				try {
-					dep = depProvider.get().init(DepType.valueOf(depParts[1]),
-							depParts[0], depParts[2], null);
-				} catch (NoOpDependency e) {
-					throw new SuperNannyError(
-							"Cannot specify NOOP for exports!");
-				}
-
-				// check if the publish folder is set, if not assume "."
-				if (depParts.length == 4) {
-					dep.setDepFolder(new File(depParts[3]));
-				}
-
-				deps.add(dep);
-			}
-		} catch (FileNotFoundException e) {
-			l.info("Export file not found - not a supernanny project? Expected to find "
-					+ exportsFile.toString());
-			System.exit(1);
-		} catch (IOException e) {
-			l.info("Error in exports file : " + exportsFile.toString());
-			System.exit(1);
-		} catch (ArrayIndexOutOfBoundsException e) {
-			l.info("Error in exports file : " + exportsFile.toString());
-			System.exit(1);
-		}
-
-		return deps;
+		return exports;
 	}
 
 	@Override
@@ -298,120 +137,6 @@ public class SuperNannyUtil implements Util {
 	}
 
 	@Override
-	public String implodeArray(String[] inputArray, String glueString) {
-		/** Output variable */
-		String output = "";
-
-		if (inputArray.length > 0) {
-			StringBuilder sb = new StringBuilder();
-			sb.append(inputArray[0]);
-
-			for (int i = 1; i < inputArray.length; i++) {
-				sb.append(glueString);
-				sb.append(inputArray[i]);
-			}
-
-			output = sb.toString();
-		}
-
-		return output;
-	}
-
-	@Override
-	public File getFile(File projectPath, String depFile) {
-		return new File(projectPath, depFile);
-	}
-
-	@Override
-	public String getProjectVersion(File depRoot) throws IOException {
-		Dependency projectDependancy = null;
-		try {
-			projectDependancy = getProjectDependancy(depRoot);
-		} catch (NoOpDependency e) {
-			// ignore NOOPS
-		}
-		if (projectDependancy == null) {
-			return null;
-		} else {
-			return projectDependancy.getVersion();
-		}
-	}
-
-	@Override
-	public String getNextVersion(String format, String latest) {
-		String[] latestParts = latest.split("[.,-]");
-		String[] formatParts = format.split("[.,-]");
-
-		if (latestParts.length < formatParts.length) {
-			l.severe(MessageFormat
-					.format("Entered format has too many parts -- current latest version is {0}, which has only {1} parts, while the given format {2} has {3}.",
-							latest.toString(), latestParts.length, format,
-							formatParts.length));
-			System.exit(1);
-		}
-
-		// extract all separators
-		String[] latestSeparators = new String[latestParts.length - 1];
-		{
-			int i = 0;
-			for (char c : latest.toCharArray()) {
-				if ("[.,-]".contains(c + "")) {
-					latestSeparators[i++] = c + "";
-				}
-			}
-		}
-
-		StringBuilder nextVersion = new StringBuilder();
-		boolean didIncrease = false;
-
-		for (int i = 0; i < latestParts.length; i++) {
-			if (didIncrease) {
-				if (formatParts.length > i) {
-					l.severe("Given format is not correct; cannot contain anything after the first +.");
-					System.exit(1);
-				}
-				// already increased, just pad 0
-				nextVersion.append(0);
-			} else if (formatParts[i].equals("x")) {
-				// use
-				nextVersion.append(latestParts[i]);
-			} else if (formatParts[i].equals("+")) {
-				// increase
-				if (!didIncrease) {
-					nextVersion.append(1 + Integer.parseInt(latestParts[i]));
-					didIncrease = true;
-				} else {
-					l.severe("Given format is not correct; can only contain a single +.");
-					System.exit(1);
-				}
-			} else {
-				l.severe("Entered format is wrong; can only contain delimiters, + and x.");
-				System.exit(1);
-			}
-
-			// add the format delimiter if not last iteration
-			if (latestParts.length > i + 1) {
-				nextVersion.append(latestSeparators[i]);
-			}
-		}
-
-		return nextVersion.toString();
-	}
-
-	@Override
-	public Map<String, String> parseForcedVersions(String[] versions) {
-		HashMap<String, String> v = new HashMap<String, String>();
-
-		for (String dep : versions) {
-			// format: dep=ver, e.g. befw=1.3.2
-			String[] parts = dep.split("=");
-			v.put(parts[0], parts[1]);
-		}
-
-		return v;
-	}
-
-	@Override
 	public String readPassword() throws IOException {
 		String password = null;
 		Console cons;
@@ -434,12 +159,218 @@ public class SuperNannyUtil implements Util {
 	}
 
 	@Override
-	public List<DavResource> getDavCahce(String uri) {
-		return davCache.get(uri);
+	public String[] getCredentialsFromProperties() throws IOException {
+		Properties properties = new Properties();
+		properties.load(new FileInputStream(System.getProperty("user.home") + File.separator
+				+ PROPERTIES_FILE));
+
+		return new String[] { properties.getProperty("username"),
+				properties.getProperty("password") };
 	}
 
 	@Override
-	public void setDavCache(String uri, List<DavResource> resources) {
-		davCache.put(uri, resources);
+	public boolean confirmYN(String message) throws IOException {
+		if (p.force) {
+			System.out.println(message + " - forced");
+			return true;
+		} else {
+			String input = readInput(message + " [y/n]");
+
+			return ("y".equals(input.trim().toLowerCase()));
+		}
+	}
+
+	@Override
+	public boolean isSymlink(File f) throws IOException {
+		// Checking for symlinks in java is practically impossible
+		return execProcess("test -h " + f.getAbsolutePath()) == 0;
+	}
+
+	@Override
+	public Requirement getProjectInfo(File depRoot) throws IOException {
+		File statFile = new File(depRoot, SUPERNANNY_VERSION_FILE);
+
+		if (statFile.exists()) {
+
+			BufferedReader reader = new BufferedReader(new FileReader(statFile));
+			String line = null;
+			try {
+				while ((line = reader.readLine()) != null) {
+					// ignore empty and commented lines
+					if (line.trim().startsWith(COMMENT_START_CHAR) || line.trim().length() == 0) {
+						continue;
+					}
+					String[] lineParts = line.split("\\s");
+					return new Requirement(lineParts[0], ReqType.EQ, lineParts[3],
+							RepositoryType.valueOf(lineParts[1]), lineParts[2]);
+				}
+			} finally {
+				reader.close();
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Wrapper for process execution, getting and parsing the stderr/stdout, and
+	 * redirecting it to the logger.
+	 * 
+	 * @param command
+	 *            to execute.
+	 * @return
+	 * @throws IOException
+	 *             if something goes wrong in process pipes.
+	 */
+	@Override
+	public String readProcess(String command) throws SuperNannyError, IOException {
+		l.info("Executing: " + command);
+
+		Process p = null;
+		try {
+			p = Runtime.getRuntime().exec(command);
+		} catch (IOException e) {
+			l.log(Level.SEVERE,
+					"Failed running the required program. Please install and check it and try again!",
+					e);
+			throw new SuperNannyError(e);
+		}
+
+		int exitVal = -1;
+		try {
+			exitVal = p.waitFor();
+		} catch (InterruptedException e) {
+			throw new SuperNannyError(e);
+		}
+
+		BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+		StringBuffer sb = new StringBuffer("");
+
+		// start an async read from stdout
+		ProcessReader r = new ProcessReader(input);
+		r.run();
+
+		// read from stderr
+		input = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+		sb.append("\n");
+		String line = null;
+		while ((line = input.readLine()) != null) {
+			sb.append(line + "\n");
+		}
+
+		// wait for the stdout thread to finish and append the result
+		try {
+			r.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		String stdOut = r.getOutput();
+		sb.append(stdOut);
+
+		l.fine(stdOut);
+		if (exitVal != 0) {
+			throw new SuperNannyError(MessageFormat.format(
+					"Error executing: {0}; output: {1}; exit code {2}", command, sb.toString(),
+					exitVal));
+		}
+
+		return stdOut;
+	}
+
+	@Override
+	public void printColumns(List<String[]> rows, String prefix, String colSep, int sortCol,
+			boolean ascending) {
+		sortRowsByColumn(rows, sortCol, ascending);
+		printColumns(rows, prefix, colSep);
+	}
+
+	@Override
+	public void sortRowsByColumn(List<String[]> rows, final int sortCol, final boolean ascending) {
+		Collections.sort(rows, new Comparator<String[]>() {
+			@Override
+			public int compare(String[] o1, String[] o2) {
+				int order = ascending ? 1 : -1;
+				String left = "";
+				String right = "";
+				
+				if (o1.length > sortCol && o1[sortCol] != null) {
+					left = o1[sortCol];
+				}
+
+				if (o2.length > sortCol && o2[sortCol] != null) {
+					right = o2[sortCol];
+				}
+				return order * left.compareTo(right);
+			}
+		});
+	}
+
+	@Override
+	public void printColumns(List<String[]> rows, String prefix, String colSep) {
+		if (rows.size() > 0) {
+			int[] maxlengths = new int[100];
+
+			// find maxlengths for each colums
+			for (String[] cols : rows) {
+				for (int i = 0; i < cols.length; i++) {
+					if (cols[i].length() > maxlengths[i]) {
+						maxlengths[i] = cols[i].length();
+					}
+				}
+			}
+			for (String[] cols : rows) {
+				System.out.print(prefix);
+				for (int i = 0; i < cols.length; i++) {
+					if (maxlengths[i] == 0) {
+						continue;
+					}
+					System.out.printf("%-" + maxlengths[i] + "s" + colSep, cols[i]);
+				}
+				System.out.println("");
+			}
+		}
+	}
+
+	@Override
+	public int execProcess(String command) throws IOException {
+		Process p = Runtime.getRuntime().exec(command);
+		try {
+			p.waitFor();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		return p.exitValue();
+	}
+}
+
+/**
+ * Simple thread that reads from bufferereade
+ * 
+ * @author Goran Petrovic <gpetrovic@tuenti.com>
+ */
+class ProcessReader extends Thread {
+	BufferedReader r = null;
+	StringBuffer sb = new StringBuffer("");
+
+	public ProcessReader(BufferedReader r) {
+		super();
+		this.r = r;
+	}
+
+	@Override
+	public void run() {
+		String line = null;
+		try {
+			while ((line = r.readLine()) != null) {
+				sb.append(line);
+				sb.append("\n");
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public String getOutput() {
+		return sb.toString();
 	}
 }

@@ -8,6 +8,7 @@
 package com.tuenti.supernanny.ant;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -68,6 +69,11 @@ public class SuperNannyStatus extends Task {
 			}
 		});
 		
-		System.out.println(injector.getInstance(ProjectStatus.class));
+		ProjectStatus ps = injector.getInstance(ProjectStatus.class);
+		try {
+			ps.printStatus();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 }

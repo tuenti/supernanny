@@ -4,6 +4,8 @@
  * @package Build
  * @subpackage Dependencies
  * @author Goran Petrovic <gpetrovic@tuenti.com>
+ * @author David Santiago <dsantiago@tuenti.com> Adding ArtifactInfo
+ * @author Jesus Bravo Alvarez <suso@tuenti.com>
  */
 package com.tuenti.supernanny.strategy;
 
@@ -11,8 +13,9 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import com.google.inject.Inject;
 import com.tuenti.supernanny.SuperNannyError;
-import com.tuenti.supernanny.strategy.common.DvcsStrategy;
+import com.tuenti.supernanny.Util;
 
 /**
  * Dependency handler git for SuperNanny.
@@ -21,141 +24,147 @@ import com.tuenti.supernanny.strategy.common.DvcsStrategy;
  */
 public class GitStrategy extends DvcsStrategy {
 	private static final String GIT = "git";
+	@Inject
+	Util util;
 
 	@Override
-	public void init(File depFolder, String url) throws SuperNannyError,
-			IOException {
+	public void init(File depFolder, String uri) throws SuperNannyError, IOException {
 		StringBuilder stringBuilder = new StringBuilder();
 		stringBuilder.append(GIT);
 		stringBuilder.append(" init ");
 		stringBuilder.append(depFolder.toString());
-		readProcess(stringBuilder.toString());
-		stringBuilder = new StringBuilder();
-		stringBuilder.append(GIT);
-		stringBuilder.append(" --git-dir ");
-		stringBuilder.append(depFolder.toString());
-		stringBuilder.append("/.git remote add origin ");
-		stringBuilder.append(url);
+		util.readProcess(stringBuilder.toString());
+		stringBuilder = this.getGitInitCommandStringFor(depFolder);
+		stringBuilder.append("remote add origin ");
+		stringBuilder.append(uri);
 		stringBuilder.append("");
-		readProcess(stringBuilder.toString());
+		util.readProcess(stringBuilder.toString());
 	}
 
 	@Override
-	public void checkout(File depFolder, String uri, String version)
+	public String checkout(File depFolder, String uri, String version, String changeset)
 			throws SuperNannyError, IOException {
 
-		StringBuilder stringBuilder = new StringBuilder();
-		stringBuilder.append(GIT);
-		stringBuilder.append(" --git-dir ");
+		StringBuilder stringBuilder = getGitInitCommandStringFor(depFolder);
+		stringBuilder.append("--work-tree ");
 		stringBuilder.append(depFolder.toString());
-		stringBuilder.append("/.git --work-tree ");
-		stringBuilder.append(depFolder.toString());
-		stringBuilder.append(" checkout FETCH_HEAD");
-		readProcess(stringBuilder.toString());
+		stringBuilder.append(" checkout " + changeset);
+		util.readProcess(stringBuilder.toString());
+
+		return changeset;
 	}
 
 	@Override
-	public String pull(File depFolder, String uri, String version)
+	public String pull(File depFolder, String uri, String name, String version, String changeset)
 			throws IOException {
-
-		if (version.contains("*")) {
-			version = matchVersion(depFolder, uri, version);
-		}
-		
-		version.replace("refs/tags/", "");
-
-		StringBuilder stringBuilder = new StringBuilder();
-		stringBuilder.append(GIT);
-		stringBuilder.append(" --git-dir ");
-		stringBuilder.append(depFolder.toString());
-		stringBuilder.append("/.git fetch origin ");
+		StringBuilder stringBuilder = getGitInitCommandStringFor(depFolder);
+		stringBuilder.append("fetch origin ");
 		stringBuilder.append(version);
-		readProcess(stringBuilder.toString());
+		util.readProcess(stringBuilder.toString());
 
 		return version;
 	}
 
 	@Override
-	public void publish(String name, File depFolder, String uri, String version)
-			throws IOException {
-		String gitFolder = ".";
-		version = version.replace("refs/tags/", "");
-
+	public void makeTag(File depFolder, String uri, String tagName) throws IOException {
 		StringBuilder stringBuilder = new StringBuilder();
 		stringBuilder.append(GIT);
-		stringBuilder.append(" --git-dir ");
+		stringBuilder.append(" tag ");
+		stringBuilder.append(tagName);
+		util.readProcess(stringBuilder.toString());
 
-		stringBuilder.append(gitFolder);
-		stringBuilder.append("/.git tag ");
-		stringBuilder.append(version);
-		readProcess(stringBuilder.toString());
 		stringBuilder = new StringBuilder();
 		stringBuilder.append(GIT);
-		stringBuilder.append(" --git-dir ");
-		stringBuilder.append(gitFolder);
-		stringBuilder.append("/.git push origin tag ");
-		stringBuilder.append(version);
-		readProcess(stringBuilder.toString());
+		stringBuilder.append(" push origin tag ");
+		stringBuilder.append(tagName);
+		util.readProcess(stringBuilder.toString());
 	}
 
 	@Override
-	public String matchVersion(File depFolder, String uri, String versionPrefix) {
-		String latestVersion = null;
-		try {
-			latestVersion = getLatestVersion(getTags(uri, versionPrefix));
-		} catch (SuperNannyError e) {
-			l.warning("No versions matched for " + versionPrefix
-					+ " for project " + depFolder);
-			System.exit(0);
-		} catch (IOException e) {
-			l.warning("No versions matched for " + versionPrefix
-					+ " for project " + depFolder);
-			System.exit(0);
+	public String resolveReference(String uri, String ref) throws IOException {
+		String[] split = util.readProcess("git ls-remote " + uri + " " + ref).split("\\s");
+		if (split.length>0) {
+			String changeset = split[0].trim();
+			if (!"".equals(changeset)) {
+				return changeset;
+			}
 		}
-		return latestVersion;
+		return null;
 	}
 
-	private String[] getTags(String uri, String versionPrefix)
-			throws SuperNannyError, IOException {
+	@Override
+	public String[] getTags(String uri, String name) throws SuperNannyError, IOException {
+		String tagPrefix = name + Util.ARCHIVE_VERSION_DELIMITER;
 		StringBuilder stringBuilder = new StringBuilder();
 		stringBuilder.append(GIT);
 		stringBuilder.append(" ls-remote --tags ");
 		stringBuilder.append(uri);
 		stringBuilder.append(" ");
-		stringBuilder.append(versionPrefix);
+		stringBuilder.append(tagPrefix + "*");
 
 		// get tags in format - list of lines of format: SHA tagName
-		String[] fullTags = readProcess(stringBuilder.toString()).split("\\n");
+		String[] fullTags = util.readProcess(stringBuilder.toString()).split("\\n");
 		String[] tags = new String[fullTags.length];
 
 		// split tag names only
 		int i = 0;
-
 		for (String tag : fullTags) {
 			String[] splitTags = tag.split("\\s");
 			if (splitTags.length != 2) {
-				System.err
-						.println(MessageFormat
-								.format("Tag matching {0} not found in {1}. Make sure the correc tag exists.",
-										versionPrefix, uri));
-				System.exit(1);
+				throw new SuperNannyError(MessageFormat.format(
+						"Tags not found in {1}. Make sure the correct tag exists.", uri));
 			} else {
-				tags[i++] = splitTags[1];
+				tags[i++] = splitTags[1].replace("refs/tags/", "");
 			}
 		}
 
 		return tags;
 	}
 
+	/**
+	 * Builds the initial part of a git command invocation for the given folder.
+	 * 
+	 * @author David Santiago <dsantiago@tuenti.com>
+	 * @param folder
+	 *            The folder for the Git repo.
+	 * @return StringBuilder Initial part of the git command invocation.
+	 */
+	private StringBuilder getGitInitCommandStringFor(File folder) {
+		return this.getGitInitCommandStringFor(folder.toString());
+	}
+
+	/**
+	 * Builds the initial part of a git command invocation for the given folder.
+	 * 
+	 * @author David Santiago <dsantiago@tuenti.com>
+	 * @param folder
+	 *            The folder for the Git repo.
+	 * @return StringBuilder Initial part of the git command invocation.
+	 */
+	private StringBuilder getGitInitCommandStringFor(String folder) {
+		StringBuilder stringBuilder = new StringBuilder();
+		stringBuilder.append(GIT);
+		stringBuilder.append(" --git-dir ");
+		stringBuilder.append(folder);
+		stringBuilder.append("/.git ");
+
+		return stringBuilder;
+	}
+
 	@Override
-	public String getLatestVersion(String name, String uri) {
+	protected void cleanup(File depFolder) {
 		try {
-			return "refs/tags/" + getLatestVersion(getTags(uri, ""));
+			util.deleteDir(new File(depFolder, ".git"));
 		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (SuperNannyError e) {
-			e.printStackTrace();
+			System.err.println(e);
 		}
-		return null;
+		new File(depFolder, ".gitignore").delete();
+	}
+
+	@Override
+	protected String getRepoChangeset(File repo) throws SuperNannyError, IOException {
+		StringBuilder stringBuilder = getGitInitCommandStringFor(repo);
+		stringBuilder.append(" rev-parse HEAD");
+		return util.readProcess(stringBuilder.toString()).trim();
 	}
 }

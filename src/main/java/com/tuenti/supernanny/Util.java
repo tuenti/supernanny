@@ -4,20 +4,17 @@
  * @package Build
  * @subpackage Dependencies
  * @author Goran Petrovic <gpetrovic@tuenti.com>
+ * @author Jesus Bravo Alvarez <suso@tuenti.com>
  */
 package com.tuenti.supernanny;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
-import com.googlecode.sardine.DavResource;
-import com.tuenti.supernanny.cli.handlers.CliParser;
-import com.tuenti.supernanny.dependencies.Dependency;
-import com.tuenti.supernanny.dependencies.Dependency.DepType;
-import com.tuenti.supernanny.dependencies.NoOpDependency;
+import com.tuenti.supernanny.dependencies.RepositoryType;
+import com.tuenti.supernanny.repo.artifacts.Export;
+import com.tuenti.supernanny.repo.artifacts.Requirement;
 
 /**
  * Utility interface for SuperNanny.
@@ -28,31 +25,16 @@ import com.tuenti.supernanny.dependencies.NoOpDependency;
  */
 public interface Util {
 	public static final String ARCHIVE_VERSION_DELIMITER = "-";
+	public static final String ARCHIVE_SUFFIX_DELIMITER = "_";
 	public static final String SUPERNANNY_VERSION_FILE = ".supernanny";
 	public static final String DEP_FILE = ".DEP";
 	public static final String EXPORT_FILE = ".EXPORT";
 	public static final String DEP_FOLDER = "lib";
 	public static final String COMMENT_START_CHAR = "#";
 	public static final Integer EXECUTOR_POOL_SIZE = 10;
-	public static final String VERSION = "Supernanny 1.10";
-
-	/**
-	 * Parse the dependencies file.
-	 * 
-	 * @param depsFile
-	 *            file containing dep definition.
-	 * @return collection of dependencies parsed.
-	 */
-	public abstract LinkedList<Dependency> parseDepsFile(File depsFile);
-	
-	/**
-	 * Parse a list of dependency files.
-	 * 
-	 * @param depsFiles
-	 *            list of files containing dep definition.
-	 * @return collection of dependencies parsed.
-	 */
-	public abstract LinkedList<Dependency> parseMultipleDepFiles(Iterable<File> depsFile);
+	public static final String VERSION = "Supernanny 2.2";
+	public static final String PROPERTIES_FILE = "supernanny.properties";
+	public static final String LIB_DELIMITER = "_";
 
 	/**
 	 * Parse the exports file.
@@ -60,8 +42,9 @@ public interface Util {
 	 * @param exportsFile
 	 *            file containing dep definition.
 	 * @return collection of export deps parsed.
+	 * @throws IOException
 	 */
-	public abstract LinkedList<Dependency> parseExportsFile(File exportsFile);
+	public abstract List<Export> parseExportsFile(File exportsFile) throws IOException;
 
 	/**
 	 * Read input from the terminal.
@@ -87,9 +70,15 @@ public interface Util {
 	 * 
 	 * @return dependencies folder.
 	 */
-	public abstract String getDepsFolder();
+	public abstract File getDepsFolder();
 
-	public abstract void deleteDir(File dir);
+	/**
+	 * Delete a directory recursively
+	 * 
+	 * @param dir
+	 * @throws IOException
+	 */
+	public abstract void deleteDir(File dir) throws IOException;
 
 	/**
 	 * Stamp the project by writing a SuperNanny version file to it.
@@ -98,6 +87,8 @@ public interface Util {
 	 * 
 	 * timestamp repo_type uri version
 	 * 
+	 * @param name
+	 *            the name of the dependency
 	 * @param depFolder
 	 *            the folder the dependency will occupy.
 	 * @param uri
@@ -109,101 +100,26 @@ public interface Util {
 	 * @throws IOException
 	 *             if file writing error happens.
 	 */
-	public abstract void stampProject(File depFolder, String uri,
-			String version, DepType type) throws IOException;
+	public abstract void stampProject(String name, File depFolder, String uri, String version,
+			RepositoryType type) throws IOException;
 
-	/**
-	 * Get the project's dependency type.
-	 * 
-	 * @param depRoot
-	 *            root of the project.
-	 * @return type of the dependency.
-	 * @throws IOException
-	 *             if the project metadata cannot be read.
-	 * @throws NoOpDependency if NOOP type is selected.
-	 */
-	public abstract DepType getProjectDepType(File depRoot) throws IOException, NoOpDependency;
-
-	/**
-	 * Get the project's dependency type.
-	 * 
-	 * @param depRoot
-	 *            root of the project.
-	 * @return type of the dependency.
-	 * @throws IOException
-	 *             if the project metadata cannot be read.
-	 * @throws NoOpDependency if NOOP type is selected.
-	 */
-	public Dependency getProjectDependancy(File depRoot) throws IOException, NoOpDependency;
-
-	/**
-	 * Implode the array, gluing elements with <var>glueString</var>.
-	 * 
-	 * @param inputArray
-	 *            array of strings.
-	 * @param glueString
-	 *            string to use as a delimiter.
-	 * @return imploded string.
-	 */
-	public String implodeArray(String[] inputArray, String glueString);
-
-	/**
-	 * Returns a file combining the folder and the file name.
-	 * 
-	 * @param projectPath
-	 *            folder path.
-	 * @param depFile
-	 *            abstract name of the file.
-	 * @return requested file.
-	 */
-	public abstract File getFile(File projectPath, String depFile);
-
-	/**
-	 * Returns the dependency's version.
-	 * 
-	 * @param depRoot
-	 *            root of the project.
-	 * 
-	 * @return version of the dependency.
-	 * @throws IOException
-	 *             if the project metadata cannot be read.
-	 */
-	public abstract String getProjectVersion(File depRoot) throws IOException;
-	
-	public abstract String getNextVersion(String format, String latest);
-
-	/**
-	 * Parse versions from cli.
-	 * @param versions cli input.
-	 * @returns map of dependency to version.
-	 */
-	public abstract Map<String, String> parseForcedVersions(String[] versions);
-	
 	/**
 	 * Read a password from the console.
+	 * 
 	 * @return the password read.
-	 * @throws IOException on terminal error.
+	 * @throws IOException
+	 *             on terminal error.
 	 */
 	public String readPassword() throws IOException;
-	
-	/**
-	 * Read the file, line by line, ignoring comments.
-	 * 
-	 * @param f
-	 *            file to read.
-	 * @return iterator of lines
-	 * @throws IOException
-	 *             if something goes wrong while reading the file.
-	 */
-	public Iterable<String> lineByLine(File f) throws IOException;
 
 	/**
 	 * Set the project's root folder.
 	 * 
-	 * @param projectPath abstract root folder.
+	 * @param projectPath
+	 *            abstract root folder.
 	 */
 	public abstract void setRoot(File projectPath);
-	
+
 	/**
 	 * Get the project's root folder.
 	 * 
@@ -212,27 +128,99 @@ public interface Util {
 	public abstract File getRoot();
 
 	/**
-	 * Get deps form multiple files.
+	 * Get the username/password for services form properties file.
 	 * 
-	 * @param p CliParser with the input.
-	 * @return list of dependencies
+	 * @return array of username and password.
 	 */
-	LinkedList<Dependency> parseMultipleDepFiles(CliParser p);
+	public String[] getCredentialsFromProperties() throws IOException;
 
 	/**
-	 * Get the cache from web dav.
+	 * Ask the user for confirmation
 	 * 
-	 * @param uri http uri of the dav server.
-	 * @return list of files on the server.
+	 * @param string
+	 * @return true if the user wants to proceed
+	 * @throws IOException
 	 */
-	public abstract List<DavResource> getDavCahce(String uri);
+	public abstract boolean confirmYN(String string) throws IOException;
 
 	/**
-	 * Get the cache from web dav.
+	 * Check if the given file appears to be a symlink
 	 * 
-	 * @return list of files on the server.
-	 * @param uri http uri of the dav server.
-	 * @param resources to persist.
+	 * @param f
+	 * @return
+	 * @throws IOException
 	 */
-	public abstract void setDavCache(String uri, List<DavResource> resources);
+	public abstract boolean isSymlink(File f) throws IOException;
+
+	/**
+	 * Get information on the currently checked out library
+	 * 
+	 * @param folder
+	 * @return Requirement of the current version
+	 * @throws IOException
+	 */
+	public abstract Requirement getProjectInfo(File folder) throws IOException;
+
+	/**
+	 * Execute a process and read its response
+	 * 
+	 * @param command
+	 *            Command to run
+	 * @return Command's stdout
+	 * @throws SuperNannyError
+	 * @throws IOException
+	 */
+	public String readProcess(String command) throws SuperNannyError, IOException;
+
+	/**
+	 * Read a file returning all lines read
+	 * 
+	 * @param f
+	 * @return
+	 * @throws IOException
+	 */
+	Iterable<String> lineByLine(File f) throws IOException;
+
+	/**
+	 * Print a matrix of strings choosing an appropriate width for each column
+	 * 
+	 * @param rows
+	 *            Rows to print
+	 * @param prefix
+	 *            PRefix to prepend to all rows (useful for indenting)
+	 * @param colSep
+	 *            String to include between columns
+	 */
+	public void printColumns(List<String[]> rows, String prefix, String colSep);
+
+	/**
+	 * Print columns sorting them by the given column
+	 * 
+	 * @param rows
+	 * @param prefix
+	 * @param colSep
+	 * @param sortCol
+	 * @param ascending
+	 */
+	void printColumns(List<String[]> rows, String prefix, String colSep, int sortCol,
+			boolean ascending);
+
+	/**
+	 * Sort rows by the given column
+	 * 
+	 * @param rows
+	 * @param sortCol
+	 * @param ascending
+	 */
+	void sortRowsByColumn(List<String[]> rows, int sortCol, boolean ascending);
+
+	/**
+	 * Run the given process and return status
+	 * 
+	 * @param command
+	 * @return status
+	 * @throws IOException
+	 */
+	int execProcess(String command) throws IOException;
+
 }

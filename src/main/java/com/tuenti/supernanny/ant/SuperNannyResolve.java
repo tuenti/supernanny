@@ -35,6 +35,11 @@ public class SuperNannyResolve extends Task {
 	private String root = ".";
 	private boolean skip = false;
 	private String depFile = "";
+	private boolean skipCleanup = false;
+
+	public void setSkipCleanup(boolean skipCleanup) {
+		this.skipCleanup = skipCleanup;
+	}
 
 	public void setRoot(String root) {
 		this.root = root;
@@ -69,6 +74,7 @@ public class SuperNannyResolve extends Task {
 		try {
 			CliParser p = new CliParser();
 			p.depfile = this.depFile;
+			p.skipCleanup = this.skipCleanup;
 			util.setRoot(new File(root));
 			fetcher.resolve(new File(root), p);
 		} catch (IOException e) {

@@ -2,6 +2,7 @@ package com.tuenti.supernanny.cli;
 
 import com.google.inject.Inject;
 import com.sampullara.cli.Args;
+import com.tuenti.supernanny.cli.handlers.CliCleanHandler;
 import com.tuenti.supernanny.cli.handlers.CliDeleteHandler;
 import com.tuenti.supernanny.cli.handlers.CliExportsHandler;
 import com.tuenti.supernanny.cli.handlers.CliFetchHandler;
@@ -26,7 +27,8 @@ public class SuperNannyApp {
 	private CliDeleteHandler deleteHandler;
 	@Inject
 	private CliVersionHandler versionHandler;
-
+	@Inject
+	private CliCleanHandler cleanHandler;
 	/**
 	 * Run the correct entry point.
 	 * 
@@ -57,6 +59,8 @@ public class SuperNannyApp {
 			requestHandler = publishHandler;
 		} else if (p.delete != null) {
 			requestHandler = deleteHandler;
+		} else if (p.clean) {
+			requestHandler = cleanHandler;
 		} else {
 			helpAndDie(0);
 		}

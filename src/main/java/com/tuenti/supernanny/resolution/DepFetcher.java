@@ -5,18 +5,21 @@
  * @subpackage Dependencies
  * @author Goran Petrovic <gpetrovic@tuenti.com>
  * @author Daniel Fanjul <dfanjul@tuenti.com>
+ * @author Jesus Bravo Alvarez <suso@tuenti.com>
  */
 package com.tuenti.supernanny.resolution;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.logging.Logger;
@@ -24,8 +27,15 @@ import java.util.logging.Logger;
 import com.google.inject.Inject;
 import com.tuenti.supernanny.Util;
 import com.tuenti.supernanny.cli.handlers.CliParser;
-import com.tuenti.supernanny.dependencies.Dependency;
-import com.tuenti.supernanny.dependencies.Dependency.DepType;
+import com.tuenti.supernanny.dependencies.DependencyParser;
+import com.tuenti.supernanny.dependencies.InvalidFormatException;
+import com.tuenti.supernanny.dependencies.SNDependencyParser;
+import com.tuenti.supernanny.repo.RepoProvider;
+import com.tuenti.supernanny.repo.Repository;
+import com.tuenti.supernanny.repo.artifacts.Artifact;
+import com.tuenti.supernanny.repo.artifacts.ReqType;
+import com.tuenti.supernanny.repo.artifacts.Requirement;
+import com.tuenti.supernanny.repo.exceptions.ResolutionException;
 
 /**
  * Dependency fetcher for SuperNanny.
@@ -36,9 +46,31 @@ import com.tuenti.supernanny.dependencies.Dependency.DepType;
  * @author Daniel Fanjul <dfanjul@tuenti.com>
  */
 public class DepFetcher {
+
+	private final class FetchTask implements Callable<FetchTask> {
+		private final Set<String> expectedDirs;
+		private final Artifact artifact;
+		private boolean hadToFetch;
+
+		private FetchTask(Set<String> expectedDirs, Artifact artifact) {
+			this.expectedDirs = expectedDirs;
+			this.artifact = artifact;
+		}
+
+		@Override
+		public FetchTask call() throws Exception {
+			hadToFetch = fetchArtifact(expectedDirs, artifact);
+			return this;
+		}
+	}
+
 	Util util;
 	Logger l;
 	ExecutorService executor;
+	@Inject
+	RepoProvider repoProvider;
+	@Inject
+	Resolver resolver;
 
 	@Inject
 	public DepFetcher(ExecutorService executor, Util util, Logger l) {
@@ -48,105 +80,120 @@ public class DepFetcher {
 	}
 
 	public void resolve(File projectPath, CliParser p) throws IOException {
-		Map<String, Future<File>> jobs = new HashMap<String, Future<File>>();
-
-		// use overridden versions from CLI
-		Map<String, String> ver = new HashMap<String, String>();
-		if (p != null && p.force != null) {
-			ver = util.parseForcedVersions(p.force);
+		try {
+			doResolve(p);
+		} finally {
+			executor.shutdown();
 		}
+	}
 
+	private void doResolve(CliParser p) throws IOException {
 		// fetch needed deps
-		LinkedList<Dependency> parseMultipleDepFiles = util
-				.parseMultipleDepFiles(p);
-		work(parseMultipleDepFiles, jobs, executor, ver, p);
+		System.out.println("Init repos");
+		DependencyParser dparser = new SNDependencyParser(ReqType.SW, util);
+		List<Requirement> reqs = null;
+		try {
+			reqs = dparser.parseMultipleDepFiles(p);
+		} catch (FileNotFoundException e) {
+			System.err.println("Dep file not found, sure this is a supernanny repo?");
+			System.exit(1);
+		} catch (InvalidFormatException e) {
+			System.err.println("Invalid format" + e);
+			System.exit(1);
+		}
 
-		executor.shutdown();
+		DependencyParser defaultParser = new SNDependencyParser(ReqType.GE, util);
+		repoProvider.setDependencyParser(defaultParser);
 
-		// delete untracked projects
-		for (File f : util.getFile(null, util.getDepsFolder()).listFiles()) {
-			if (f.isDirectory() && !jobs.containsKey(f.getName())) {
-				util.deleteDir(f);
+		// init all known repos in parallel to speed things up
+		try {
+			repoProvider.warmUp(reqs, executor);
+		} catch (Exception e) {
+			System.err.println("Error initializing repos: " + e);
+			System.exit(1);
+		}
+
+		final Set<String> expectedDirs = Collections.synchronizedSet(new HashSet<String>());
+		try {
+			System.out.println("Resolve dependencies");
+			Set<Artifact> artifacts = resolver.resolve(reqs);
+
+			System.out.println("Fetch dependencies");
+			List<Future<FetchTask>> futures = new LinkedList<Future<FetchTask>>();
+			for (final Artifact artifact : artifacts) {
+				futures.add(executor.submit(new FetchTask(expectedDirs, artifact)));
+				expectedDirs.add(artifact.getName());
 			}
-		}
-	}
 
-	/**
-	 * Recursive thread definition.
-	 * 
-	 * @author Goran Petrovic <gpetrovic@tuenti.com>
-	 * @author Daniel Fanjul <dfanjul@tuenti.com>
-	 */
-	class FetchingThread implements Callable<File> {
-		private final Dependency d;
-		private final Map<String, Future<File>> jobs;
-		private final ExecutorService executor;
-		private final Map<String, String> ver;
-		private final CliParser p;
-
-		public FetchingThread(Map<String, Future<File>> jobs, Dependency d,
-				ExecutorService executor, Map<String, String> ver, CliParser p) {
-			this.d = d;
-			this.jobs = jobs;
-			this.executor = executor;
-			this.ver = ver;
-			this.p = p;
-		}
-
-		@Override
-		public File call() throws Exception {
-			File innerDep = d.fetch();
-
-			work(util.parseDepsFile(innerDep), jobs, executor, ver, p);
-
-			return innerDep;
-		}
-	}
-
-	/**
-	 * Execute the actual work of fetching.
-	 * 
-	 * @author Goran Petrovic <gpetrovic@tuenti.com>
-	 * @author Daniel Fanjul <dfanjul@tuenti.com>
-	 */
-	protected void work(LinkedList<Dependency> parseDepsFile,
-			Map<String, Future<File>> jobs, ExecutorService executor,
-			Map<String, String> ver, CliParser p) {
-		List<Future<File>> jobsList = new LinkedList<Future<File>>();
-
-		synchronized (jobs) {
-			for (Dependency d : parseDepsFile) {
-				if (!jobs.containsKey(d.getName())) {
-					if (ver.containsKey(d.getName())) {
-						d.setVersion(ver.get(d.getName()));
+			List<String[]> rows = new ArrayList<String[]>();
+			for (Future<FetchTask> future : futures) {
+				try {
+					FetchTask fetchTask = future.get();
+					String prefix = "Ok";
+					if (fetchTask.hadToFetch) {
+						prefix = "Get";
 					}
+					Artifact artifact = fetchTask.artifact;
+					rows.add(new String[] { prefix, artifact.getName(),
+							artifact.getVersion().getVersionString(),
+							artifact.getOrigin().getRepoType().toString(), artifact.getOriginUrl(), });
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+			util.printColumns(rows, "  ", "  ", 1, true);
 
-					if (p == null || !p.pretend && d.getType() != DepType.NOOP) {
-						Future<File> submit = executor
-								.submit(new FetchingThread(jobs, d, executor,
-										ver, p));
-
-						jobs.put(d.getName(), submit);
-						jobsList.add(submit);
-					} else {
-						System.out.println(MessageFormat.format(
-								"\t# would fetch {0}", d.toString()
-										.substring(2)));
+			if (!p.skipCleanup) {
+				System.out.println("Cleanup");
+				// delete all unexpected dirs in the deps folder
+				File depDir = util.getDepsFolder();
+				String[] deps = depDir.list();
+				for (String dep : deps) {
+					// skip symlinks, even though they might not be used anymore (this can be removed if the skipCleanup flag is used for all partial dep files)
+					File d = new File(depDir, dep);
+					if (!util.isSymlink(d) && !expectedDirs.contains(dep)) {
+						// delete only directories, files like DEP.override will
+						// not be deleted
+						if (d.isDirectory()) {
+							util.deleteDir(d);
+						}
 					}
 				}
 			}
+		} catch (ResolutionException e) {
+			System.out.println("Resolution error: " + e.getMessage());
+			System.exit(1);
+		}
+	}
+
+	private boolean fetchArtifact(Set<String> expectedDirs, Artifact artifact) throws IOException {
+		Repository repository = artifact.getOrigin();
+		boolean isUpdated = isUpdated(artifact);
+		if (!isUpdated) {
+			File destination = new File(util.getDepsFolder(), artifact.getName());
+			repository.fetch(artifact, destination);
 		}
 
-		for (Future<File> future : jobsList) {
-			try {
-				future.get();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-				System.exit(1);
-			} catch (ExecutionException e) {
-				e.printStackTrace();
-				System.exit(1);
+		// store repo temp dir
+		if (repository.getTmpDir() != null) {
+			expectedDirs.add(repository.getTmpDir());
+		}
+		return !isUpdated;
+	}
+
+	private boolean isUpdated(Artifact artifact) {
+		File folder = new File(util.getDepsFolder(), artifact.getName());
+		try {
+			if (!folder.exists()) {
+				return false;
 			}
+
+			return artifact.getOrigin().isUpdated(artifact, folder);
+		} catch (IOException e) {
+			l.warning(MessageFormat.format(
+					"SuperNanny dependency status file not found in {0}; refetching {1}.",
+					folder.getAbsolutePath(), artifact.getName()));
+			return false;
 		}
 	}
 }

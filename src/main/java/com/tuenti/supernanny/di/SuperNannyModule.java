@@ -18,6 +18,9 @@ import com.google.inject.name.Names;
 import com.tuenti.supernanny.SuperNannyUtil;
 import com.tuenti.supernanny.Util;
 import com.tuenti.supernanny.cli.handlers.CliParser;
+import com.tuenti.supernanny.repo.RepoProvider;
+import com.tuenti.supernanny.resolution.EagerResolver;
+import com.tuenti.supernanny.resolution.Resolver;
 
 /**
  * Guice module for SuperNanny.
@@ -33,6 +36,8 @@ public class SuperNannyModule extends AbstractModule {
 		bind(CliParser.class).asEagerSingleton();
 		bind(Integer.class).annotatedWith(Names.named("poolSize")).toInstance(
 				Util.EXECUTOR_POOL_SIZE);
+		bind(RepoProvider.class).in(Scopes.SINGLETON);
+		bind(Resolver.class).to(EagerResolver.class);
 	}
 
 	@Provides

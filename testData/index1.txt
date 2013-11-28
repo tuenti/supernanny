@@ -1,0 +1,30 @@
+Name: libphonenumber
+Version: 1.2.0
+File: libphonenumber-1.2.0.tar.bz2
+MD5: 123
+Deps:
+  tuenti-common TARBZ2 http://artifacts.tuenti.int/ <7.8
+  tfw-lib TARBZ2 http://artifacts.tuenti.int/ >1.*
+
+Name: supervisor-common
+Version: 0.33
+File: supervisor/supervisor-common-0.33.tar.bz2
+MD5: 456
+Deps:
+
+Name: fefw-fbi
+Version: 2.1
+File: fefw-fbi-2.1.tar.bz2
+MD5: 789
+Deps:
+  tuenti-build TARBZ2 http://artifacts.tuenti.int/ <=16.8
+  befw TARBZ2 http://artifacts.tuenti.int/ >=4.*
+  otro TARBZ2 http://artifacts.tuenti.int/ =~5.*
+  squeeze TARBZ2 http://artifacts.tuenti.int/ 6.*
+
+Name: supervisor-common
+Version: 1.0.1
+File: supervisor-common-1.0.1.tar.bz2
+MD5: 101
+Deps:
+

@@ -4,6 +4,7 @@
  * @package Build
  * @subpackage Dependencies
  * @author Goran Petrovic <gpetrovic@tuenti.com>
+ * @author Jesus Bravo Alvarez <suso@tuenti.com>
  */
 package com.tuenti.supernanny.cli.handlers;
 
@@ -29,17 +30,20 @@ public class CliParser {
 	@Argument(prefix = "--", description = "Format of the next version of format a.a.a where a is one of x or +. X means keep the current max value, + means increase, e.g. if current latest version is 3.1.4, with next of x.x.+ one gets 3.1.5, with next of x.+ one gets 3.2.4 and with next of +, one gets 4.1.4. Useful for pushiung new minor/major/patch versions.")
 	public String next;
 
-	@Argument(prefix = "--", description = "Prefix that will be used for all operations (e.g. --prefix=beta).")
+	@Argument(prefix = "--", description = "Prefix that will be used for all operations (e.g. --prefix beta).")
 	public String prefix;
 
-	@Argument(prefix = "--", description = "List of strings", delimiter = ",")
-	public String[] force;
+	@Argument(prefix = "--", description = "Version suffix for published artifacts")
+	public String suffix;
 
 	@Argument(prefix = "", description = "Publish a dependency")
 	public boolean publish;
 	
 	@Argument(prefix = "", description = "Delete a dependency")
 	public String delete;
+
+	@Argument(prefix = "", description = "Delete all dependencies")
+	public boolean clean;
 
 	@Argument(prefix = "", description = "Fetch project dependencies")
 	public boolean fetch;
@@ -49,10 +53,22 @@ public class CliParser {
 	
 	@Argument(alias="v", prefix = "-", description = "Shows version")
 	public boolean version;
+
+	@Argument(alias="f", prefix = "-", description = "Don't ask any questions - just do it")
+	public boolean force;
+	
+	@Argument(prefix = "--", description = "Don't delete any unreferenced libraries after fetching")
+	public boolean skipCleanup = false;
 	
 	@Argument(prefix = "--", description = "Path to the dependency file (defaults to .DEP)")
 	public String depfile;
 
+	@Argument(prefix = "--", description = "Skip verification of published artifacts checking the index")
+	public boolean skipVerifyArtifacts = false;
+
+	@Argument(prefix = "--", description = "Artifact verification timeout")
+	public String verifyTimeout = "30";
+	
 	public void setPretend(boolean b) {
 		this.pretend = b;
 	}

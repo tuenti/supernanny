@@ -1,10 +1,10 @@
 Package: supernanny
-Version: 1.10.tuenti1
+Version: 2.2.tuenti1
 Section: misc
 Priority: optional
 Architecture: all
 Depends: java-virtual-machine, mercurial, git, bzip2, tar, gzip
-Maintainer: Goran Petrovic <gpetrovic@tuenti.com>
+Maintainer: Jesus Bravo Alvarez <suso@tuenti.com>
 Distribution: development
 Description: Artifact dependency management is sometimes not enough. In large environments,
  developers need to be able to develop libraries in the scope of the bigger

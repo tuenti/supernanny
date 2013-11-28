@@ -13,6 +13,8 @@ import org.mockito.Mockito;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.google.inject.Scopes;
+import com.tuenti.supernanny.repo.RepoProvider;
 import com.tuenti.supernanny.strategy.GitStrategy;
 
 /**
@@ -31,6 +33,7 @@ public class FakeModule extends AbstractModule {
 	protected void configure() {
 		bind(Util.class).toInstance(util);
 		bind(GitStrategy.class).toInstance(strategy);
+		bind(RepoProvider.class).in(Scopes.SINGLETON);
 	}
 	
 	@Provides

@@ -8,13 +8,14 @@
 package com.tuenti.supernanny.cli.handlers;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 import com.google.inject.Inject;
 import com.tuenti.supernanny.Util;
 
 /**
- * Handler for 'status' command.
+ * Handler for 'delete' command.
  * 
  * @package Build
  * @subpackage Dependencies
@@ -27,8 +28,13 @@ public class CliDeleteHandler implements CliHandler {
 
 	@Override
 	public String handle() {
-		util.deleteDir(new File(util.getDepsFolder(), p.delete));
-		System.out.println(MessageFormat.format("Dependency {0} deleted.", p.delete));
+		try {
+			util.deleteDir(new File(util.getDepsFolder(), p.delete));
+			System.out.println(MessageFormat.format("Dependency {0} deleted.", p.delete));
+		} catch (IOException e) {
+			System.err.println(e);
+			System.exit(1);
+		}
 		return null;
 	}
 }
